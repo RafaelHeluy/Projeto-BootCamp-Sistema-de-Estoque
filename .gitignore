@@ -1,0 +1,390 @@
+const STORAGE_KEY = 'estoque-app-data';
+
+const defaultProducts = [
+  {
+    id: crypto.randomUUID(),
+    name: 'Notebook Dell',
+    category: 'Eletrônicos',
+    quantity: 12,
+    minStock: 4,
+    unitPrice: 3200,
+    supplier: 'Dell Brasil',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: crypto.randomUUID(),
+    name: 'Mouse Logitech',
+    category: 'Acessórios',
+    quantity: 25,
+    minStock: 8,
+    unitPrice: 120,
+    supplier: 'Logitech',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: crypto.randomUUID(),
+    name: 'Cabo USB-C',
+    category: 'Acessórios',
+    quantity: 3,
+    minStock: 6,
+    unitPrice: 35,
+    supplier: 'Tech Supply',
+    updatedAt: new Date().toISOString()
+  }
+];
+
+const defaultTransactions = [
+  {
+    id: crypto.randomUUID(),
+    productId: defaultProducts[0].id,
+    productName: 'Notebook Dell',
+    type: 'entry',
+    quantity: 5,
+    date: new Date().toISOString(),
+    note: 'Compra inicial'
+  },
+  {
+    id: crypto.randomUUID(),
+    productId: defaultProducts[1].id,
+    productName: 'Mouse Logitech',
+    type: 'entry',
+    quantity: 10,
+    date: new Date().toISOString(),
+    note: 'Reposição de estoque'
+  }
+];
+
+const state = {
+  products: [],
+  transactions: []
+};
+
+const elements = {
+  stats: document.getElementById('stats'),
+  productForm: document.getElementById('productForm'),
+  productId: document.getElementById('productId'),
+  formTitle: document.getElementById('formTitle'),
+  cancelEdit: document.getElementById('cancelEdit'),
+  searchInput: document.getElementById('searchInput'),
+  productTableBody: document.getElementById('productTableBody'),
+  transactionList: document.getElementById('transactionList'),
+  resetData: document.getElementById('resetData')
+};
+
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+
+  if (!saved) {
+    state.products = defaultProducts;
+    state.transactions = defaultTransactions;
+    saveState();
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    state.products = Array.isArray(parsed.products) ? parsed.products : defaultProducts;
+    state.transactions = Array.isArray(parsed.transactions) ? parsed.transactions : defaultTransactions;
+  } catch (error) {
+    state.products = defaultProducts;
+    state.transactions = defaultTransactions;
+    saveState();
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(Number(value) || 0);
+}
+
+function formatDate(dateString) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(new Date(dateString));
+}
+
+function getFilteredProducts() {
+  const search = elements.searchInput.value.trim().toLowerCase();
+
+  if (!search) {
+    return [...state.products];
+  }
+
+  return state.products.filter((product) => {
+    const text = `${product.name} ${product.category} ${product.supplier}`.toLowerCase();
+    return text.includes(search);
+  });
+}
+
+function renderStats() {
+  const totalProducts = state.products.length;
+  const totalUnits = state.products.reduce((sum, product) => sum + Number(product.quantity || 0), 0);
+  const lowStock = state.products.filter((product) => Number(product.quantity) <= Number(product.minStock)).length;
+  const inventoryValue = state.products.reduce((sum, product) => {
+    return sum + Number(product.quantity || 0) * Number(product.unitPrice || 0);
+  }, 0);
+
+  elements.stats.innerHTML = `
+    <div class="stat-card">
+      <span class="label">Produtos</span>
+      <span class="value">${totalProducts}</span>
+    </div>
+    <div class="stat-card">
+      <span class="label">Unidades em Estoque</span>
+      <span class="value">${totalUnits}</span>
+    </div>
+    <div class="stat-card">
+      <span class="label">Estoque Baixo</span>
+      <span class="value">${lowStock}</span>
+    </div>
+    <div class="stat-card">
+      <span class="label">Valor Total</span>
+      <span class="value">${formatCurrency(inventoryValue)}</span>
+    </div>
+  `;
+}
+
+function renderProducts() {
+  const products = getFilteredProducts();
+
+  if (!products.length) {
+    elements.productTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">Nenhum produto encontrado.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  elements.productTableBody.innerHTML = products.map((product) => {
+    const isLow = Number(product.quantity) <= Number(product.minStock);
+
+    return `
+      <tr>
+        <td>
+          <strong>${product.name}</strong>
+        </td>
+        <td>${product.category}</td>
+        <td>
+          <span class="badge ${isLow ? 'low' : 'ok'}">${product.quantity}</span>
+        </td>
+        <td>${product.minStock}</td>
+        <td>${formatCurrency(product.unitPrice)}</td>
+        <td>${product.supplier}</td>
+        <td>
+          <div class="row-actions">
+            <button class="small-button" type="button" data-action="edit" data-id="${product.id}">Editar</button>
+            <button class="small-button" type="button" data-action="add" data-id="${product.id}">+ Entrada</button>
+            <button class="small-button" type="button" data-action="remove" data-id="${product.id}">- Saída</button>
+            <button class="danger-button" type="button" data-action="delete" data-id="${product.id}">Excluir</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderTransactions() {
+  if (!state.transactions.length) {
+    elements.transactionList.innerHTML = '<li class="empty-state">Nenhuma movimentação registrada.</li>';
+    return;
+  }
+
+  const recentTransactions = [...state.transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+
+  elements.transactionList.innerHTML = recentTransactions.map((transaction) => `
+    <li class="transaction-item ${transaction.type === 'entry' ? 'entry' : 'exit'}">
+      <strong>${transaction.type === 'entry' ? 'Entrada' : 'Saída'} - ${transaction.productName}</strong>
+      <div>${transaction.type === 'entry' ? '+' : '-'} ${transaction.quantity} unidade(s)</div>
+      <div class="meta">${transaction.note || 'Sem observação'} • ${formatDate(transaction.date)}</div>
+    </li>
+  `).join('');
+}
+
+function renderAll() {
+  renderStats();
+  renderProducts();
+  renderTransactions();
+}
+
+function resetForm() {
+  elements.productForm.reset();
+  elements.productId.value = '';
+  elements.formTitle.textContent = 'Adicionar Produto';
+  elements.cancelEdit.classList.add('hidden');
+}
+
+function getProductFormData() {
+  return {
+    name: document.getElementById('name').value.trim(),
+    category: document.getElementById('category').value.trim(),
+    quantity: Number(document.getElementById('quantity').value || 0),
+    minStock: Number(document.getElementById('minStock').value || 0),
+    unitPrice: Number(document.getElementById('unitPrice').value || 0),
+    supplier: document.getElementById('supplier').value.trim()
+  };
+}
+
+function addProduct(event) {
+  event.preventDefault();
+
+  const productData = getProductFormData();
+
+  if (!productData.name || !productData.category || !productData.supplier) {
+    alert('Preencha todos os campos obrigatórios.');
+    return;
+  }
+
+  const product = {
+    id: elements.productId.value || crypto.randomUUID(),
+    name: productData.name,
+    category: productData.category,
+    quantity: productData.quantity,
+    minStock: productData.minStock,
+    unitPrice: productData.unitPrice,
+    supplier: productData.supplier,
+    updatedAt: new Date().toISOString()
+  };
+
+  const existingIndex = state.products.findIndex((item) => item.id === product.id);
+
+  if (existingIndex >= 0) {
+    state.products[existingIndex] = product;
+  } else {
+    state.products.push(product);
+  }
+
+  saveState();
+  renderAll();
+  resetForm();
+}
+
+function editProduct(id) {
+  const product = state.products.find((item) => item.id === id);
+
+  if (!product) return;
+
+  elements.productId.value = product.id;
+  document.getElementById('name').value = product.name;
+  document.getElementById('category').value = product.category;
+  document.getElementById('quantity').value = product.quantity;
+  document.getElementById('minStock').value = product.minStock;
+  document.getElementById('unitPrice').value = product.unitPrice;
+  document.getElementById('supplier').value = product.supplier;
+  elements.formTitle.textContent = 'Editar Produto';
+  elements.cancelEdit.classList.remove('hidden');
+  document.getElementById('name').focus();
+}
+
+function deleteProduct(id) {
+  const product = state.products.find((item) => item.id === id);
+
+  if (!product) return;
+
+  const confirmed = window.confirm(`Deseja realmente excluir o produto "${product.name}"?`);
+  if (!confirmed) return;
+
+  state.products = state.products.filter((item) => item.id !== id);
+  state.transactions = state.transactions.filter((item) => item.productId !== id);
+  saveState();
+  renderAll();
+  resetForm();
+}
+
+function createMovement(productId, type, quantity, note) {
+  const product = state.products.find((item) => item.id === productId);
+
+  if (!product) return;
+
+  const movement = {
+    id: crypto.randomUUID(),
+    productId: product.id,
+    productName: product.name,
+    type,
+    quantity,
+    date: new Date().toISOString(),
+    note
+  };
+
+  state.transactions.unshift(movement);
+  saveState();
+}
+
+function updateStock(productId, delta, note) {
+  const product = state.products.find((item) => item.id === productId);
+
+  if (!product) return;
+
+  const newQuantity = Number(product.quantity) + delta;
+
+  if (newQuantity < 0) {
+    alert('Quantidade insuficiente em estoque para essa movimentação.');
+    return;
+  }
+
+  product.quantity = newQuantity;
+  product.updatedAt = new Date().toISOString();
+
+  const type = delta > 0 ? 'entry' : 'exit';
+  const movementQty = Math.abs(delta);
+  createMovement(productId, type, movementQty, note);
+  saveState();
+  renderAll();
+}
+
+function handleQuickAction(event) {
+  const button = event.target.closest('button[data-action]');
+
+  if (!button) return;
+
+  const { action, id } = button.dataset;
+
+  if (action === 'edit') {
+    editProduct(id);
+    return;
+  }
+
+  if (action === 'delete') {
+    deleteProduct(id);
+    return;
+  }
+
+  if (action === 'add') {
+    const quantity = Number(window.prompt('Qual é a quantidade de entrada?', '1'));
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    updateStock(id, quantity, 'Entrada manual');
+    return;
+  }
+
+  if (action === 'remove') {
+    const quantity = Number(window.prompt('Qual é a quantidade de saída?', '1'));
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    updateStock(id, -quantity, 'Saída manual');
+  }
+}
+
+elements.productForm.addEventListener('submit', addProduct);
+elements.searchInput.addEventListener('input', renderProducts);
+elements.cancelEdit.addEventListener('click', resetForm);
+elements.resetData.addEventListener('click', () => {
+  const confirmed = window.confirm('Tem certeza que deseja resetar todos os dados?');
+  if (!confirmed) return;
+
+  state.products = defaultProducts;
+  state.transactions = defaultTransactions;
+  saveState();
+  renderAll();
+  resetForm();
+});
+document.addEventListener('click', handleQuickAction);
+
+loadState();
+renderAll();
+resetForm();

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Estoque</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Dashboard</p>
+          <h1>Sistema de Estoque</h1>
+        </div>
+        <button id="resetData" class="secondary-button" type="button">Resetar Dados</button>
+      </header>
+
+      <section class="stats" id="stats"></section>
+
+      <main class="content">
+        <section class="panel form-panel">
+          <div class="panel-header">
+            <h2 id="formTitle">Adicionar Produto</h2>
+          </div>
+
+          <form id="productForm">
+            <input type="hidden" id="productId" />
+
+            <div class="form-grid">
+              <label>
+                <span>Nome</span>
+                <input id="name" name="name" type="text" placeholder="Ex: Teclado Gamer" required />
+              </label>
+
+              <label>
+                <span>Categoria</span>
+                <input id="category" name="category" type="text" placeholder="Ex: Periféricos" required />
+              </label>
+
+              <label>
+                <span>Quantidade</span>
+                <input id="quantity" name="quantity" type="number" min="0" step="1" placeholder="0" required />
+              </label>
+
+              <label>
+                <span>Estoque Mínimo</span>
+                <input id="minStock" name="minStock" type="number" min="0" step="1" placeholder="0" required />
+              </label>
+
+              <label>
+                <span>Preço Unitário</span>
+                <input id="unitPrice" name="unitPrice" type="number" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+
+              <label>
+                <span>Fornecedor</span>
+                <input id="supplier" name="supplier" type="text" placeholder="Ex: Tech Supply" required />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit" class="primary-button">Salvar</button>
+              <button type="button" id="cancelEdit" class="secondary-button hidden">Cancelar</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-header">
+            <h2>Produtos</h2>
+            <div class="search-wrap">
+              <input id="searchInput" type="search" placeholder="Buscar produto..." />
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Qtd.</th>
+                  <th>Min.</th>
+                  <th>Preço</th>
+                  <th>Fornecedor</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <section class="panel log-panel">
+        <div class="panel-header">
+          <h2>Movimentações</h2>
+        </div>
+        <ul id="transactionList" class="transaction-list"></ul>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
